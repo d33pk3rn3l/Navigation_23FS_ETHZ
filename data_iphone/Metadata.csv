@@ -1,0 +1,2 @@
+version,device name,recording time,platform,appVersion,device id,sensors,sampleRateMs
+3,iPhone 12 Pro,2023-03-23_07-50-30,ios,1.13,2c03228d-b090-4897-ada5-ecd43a242201,Accelerometer|Gravity|Gyroscope|Orientation|Magnetometer|Barometer|Location|Annotation|MagnetometerUncalibrated|GyroscopeUncalibrated|AccelerometerUncalibrated,10|10|10|10|10|0|0||10|10|10
