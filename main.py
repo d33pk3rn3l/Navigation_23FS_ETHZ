@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from tools import cal_initial_roll_pitch_yaw, write_kml_file
+from tools import cal_initial_roll_pitch_yaw, write_kml_file, sensor_reduce, sensor_plot, sensor_simulate, rot_b_n
 from read_sensor_output import read_csv_physics_toolbox,read_csv_sensor_logger, read_csv_sensorlog
 
 # add directory of main.py to path
@@ -88,3 +88,75 @@ r0,p0,y0 = cal_initial_roll_pitch_yaw(sensor,init_intv[0],init_intv[1])
 print("Pitch: {0:3.4f} (computed), {1:3.4f} (recorded)".format(p0,np.mean(sensor["pitch"][init_intv[0]:init_intv[1]])))
 print("Roll: {0:3.4f} (computed), {1:3.4f} (recorded)".format(r0,np.mean(sensor["roll"][init_intv[0]:init_intv[1]])))
 print("Yaw: {0:3.4f} (computed), {1:3.4f} (recorded)".format(y0,np.mean(sensor["yaw"][init_intv[0]:init_intv[1]])))
+
+# Reduce data to first interessting part
+START = 580 # seconds
+END = 1200 # seconds
+sensor_reduced = sensor_reduce(sensor, [START, END], sampling)
+
+# Plot reduced data
+sensor_plot(sensor_reduced, ["Gyroscope"], "reduced")
+
+# Preparation
+g = 9.81
+sensor_reduced["accX"] *= -g
+sensor_reduced["accY"] *= -g
+sensor_reduced["accZ"] *= -g
+
+# Initialization
+init_position = np.array([np.mean(sensor_reduced["lat"][:100]),
+                 np.mean(sensor_reduced["lon"][:100]),
+                 np.mean(sensor_reduced["altP"][:100])])
+init_velocity = np.array([0, 0, 0])
+init_orientation = np.array([r0, p0, y0])
+
+# Integration of rotations and accelerations
+def integrate_rotations_and_accelerations(sensor_data, init_position, init_velocity, init_orientation, sampling):
+    num_data_points = len(sensor_data["time"])
+    position = np.zeros((num_data_points, 3)) # [lat, lon, alt]
+    velocity = np.zeros((num_data_points, 3)) # [v_n, v_e, v_d]
+    orientation = np.zeros((num_data_points, 3)) # [roll, pitch, yaw] in navigation frame
+
+    # Set initial values
+    position[0] = init_position
+    velocity[0] = init_velocity
+    orientation[0] = init_orientation
+
+    for i in range(1, num_data_points):
+        dt = sampling
+        rotation_rates = np.array([ sensor_data["gyroX"][i],
+                                    sensor_data["gyroY"][i],
+                                    sensor_data["gyroZ"][i]])
+        orientation[i] = orientation[i - 1] + rotation_rates * dt
+        C_bn = rot_b_n(orientation[i][0], orientation[i][1], orientation[i][2])
+        acceleration_navigation = np.dot(C_bn,
+                                         np.array([sensor_data["accX"][i],
+                                         sensor_data["accY"][i],
+                                         sensor_data["accZ"][i]]))
+        velocity[i] = velocity[i - 1] + acceleration_navigation * dt
+        position[i] = position[i - 1] + 0.5 * (velocity[i - 1] + velocity[i]) * dt
+
+    return position, velocity, orientation
+
+position, velocity, orientation = integrate_rotations_and_accelerations(sensor_reduced,
+                                                                        init_position,
+                                                                        init_velocity,
+                                                                        init_orientation,
+                                                                        sampling)
+
+# Plot position
+# Assuming `position` is a NumPy array with shape (num_data_points, 3) containing the position data
+lat = position[:, 0]
+lon = position[:, 1]
+alt = position[:, 2]
+
+# Create the scatter plot
+plt.figure()
+plt.scatter(lon, lat, c=alt, cmap='viridis', marker='.')
+plt.xlabel('Longitude')
+plt.ylabel('Latitude')
+plt.title('Position Scatter Plot')
+plt.colorbar(label='Altitude')
+plt.savefig("./output/position_scatter_plot.png", dpi=200)
+plt.show()
+
