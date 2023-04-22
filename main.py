@@ -80,6 +80,21 @@ axs1[2].set_xlabel('Time')
 plt.tight_layout()
 plt.savefig("./output/location.png",dpi=200)
 
+title = "GNSS Position Scatter Plot for whole crane experiment"
+plt.figure()
+plt.scatter(sensor["lon"],
+            sensor["lat"],
+            c=sensor["altP"],
+            #c="r",
+            cmap="inferno",
+            marker='.',)
+plt.xlabel('Longitude')
+plt.ylabel('Latitude')
+plt.title(title)
+plt.colorbar(label='Altitude')
+plt.savefig("./output/position_scatter_plot_gnss.png", dpi=200)
+plt.show()
+
 write_kml_file(sensor["lon"][10:],sensor["lat"][10:],sensor["altP"][10:],"./output/gps_location.kml")
 
 r0,p0,y0 = cal_initial_roll_pitch_yaw(sensor,init_intv[0],init_intv[1]) 
@@ -91,7 +106,7 @@ print("Yaw: {0:3.4f} (computed), {1:3.4f} (recorded)".format(y0,np.mean(sensor["
 
 # Reduce data to first interessting part
 START = 580 # seconds
-END = 800 # seconds (1100 is the end of the interesting part)
+END = 590 # seconds (1100 is the end of the interesting part)
 sensor_reduced = sensor_reduce(sensor, [START, END], sampling)
 
 # Plot reduced data
@@ -168,15 +183,14 @@ lat = position[:, 0]
 lon = position[:, 1]
 alt = position[:, 2]
 
-# Create the scatter plot
+# Create the scatter plot for integrated position
 title = "Position Scatter Plot (Period: " + str(END-START) + " seconds)"
 plt.figure()
-plt.scatter(lon, lat, c=alt, cmap='viridis', marker='.')
+plt.scatter(lon, lat, c=alt, cmap='inferno', marker='.')
 plt.xlabel('Longitude')
 plt.ylabel('Latitude')
 plt.title(title)
 plt.colorbar(label='Altitude')
 plt.savefig("./output/position_scatter_plot.png", dpi=200)
-plt.xlim([np.min(lon), np.max(lon)])
-plt.ylim([np.min(lat), np.max(lat)])
 plt.show()
+
