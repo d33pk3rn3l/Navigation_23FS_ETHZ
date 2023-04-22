@@ -5,25 +5,35 @@ Created on Fri Mar 17 15:09:39 2023
 
 @author: lukamueller
 """
-
-import matplotlib.pyplot as plt 
-import numpy as np
 import os
 import sys
 
-# add directory of main.py to path 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+from tools import cal_initial_roll_pitch_yaw, write_kml_file
+from read_sensor_output import read_csv_physics_toolbox,read_csv_sensor_logger, read_csv_sensorlog
+
+# add directory of main.py to path
 file_dir = os.path.dirname(__file__)
 sys.path.append(file_dir)
 
-from tools import cal_initial_roll_pitch_yaw,write_kml_file
-from read_sensor_output import read_csv_physics_toolbox,read_csv_sensor_logger,read_csv_sensorlog
 
 sampling = 0.05 # sampling step size (s)
-init_intv = [1000,3000] # interval to compute initial orientation
+init_intv = [2500, 5000] # interval to compute initial orientation
 skip_lines = 30 # number of epochs to skip at the beginning of the recording
 
 # data sensor_logger
-sensor = read_csv_sensor_logger(os.path.join(file_dir,"data"), "2023-03-23_07-50-30", sampling=sampling, skip_lines=skip_lines) # plt.2023-03-19_09-36-59
+sensor = read_csv_sensor_logger(os.path.join(file_dir,"data"), "2023-03-23_07-50-30",
+                                sampling=sampling,
+                                skip_lines=skip_lines) # plt.2023-03-19_09-36-59
+
+print(sensor["accX"][init_intv[0]:init_intv[1]].std())
+print(sensor["accY"][init_intv[0]:init_intv[1]].std())
+print(sensor["accZ"][init_intv[0]:init_intv[1]].std())
+
+#pd.DataFrame(sensor).to_csv(os.path.join(file_dir,"output/sensor_logger_raw_data.csv"))
 
 # data physics toolbox
 #sensor = read_csv_physics_toolbox(os.path.join(file_dir,"data"),"2023-03-1717.06.59.csv", sampling=sampling,skip_lines=skip_lines)
@@ -42,7 +52,7 @@ axs1[2].plot(sensor["time"], sensor["accZ"], color='#1a9850')
 axs1[2].set_ylabel('Acc. Z [g]')
 axs1[2].set_xlabel('Time')
 plt.tight_layout()
-plt.savefig("./Python/output/accelerations.png",dpi=200)
+plt.savefig("./output/accelerations.png",dpi=200)
 
 # Plot gyroscope data
 fig1, axs1 = plt.subplots(3, 1, sharex=True)
@@ -55,7 +65,7 @@ axs1[2].plot(sensor["time"], sensor["gyroZ"], color='#1a9850')
 axs1[2].set_ylabel('Rot. Z [rad/s]')
 axs1[2].set_xlabel('Time')
 plt.tight_layout()
-plt.savefig("./Python/output/rotations.png",dpi=200)
+plt.savefig("./output/rotations.png",dpi=200)
 
 # Plot location data
 fig1, axs1 = plt.subplots(3, 1, sharex=True)
@@ -68,7 +78,7 @@ axs1[2].plot(sensor["time"], sensor["altP"], color='#1a9850')
 axs1[2].set_ylabel('Altitude')
 axs1[2].set_xlabel('Time')
 plt.tight_layout()
-plt.savefig("./Python/output/location.png",dpi=200)
+plt.savefig("./output/location.png",dpi=200)
 
 write_kml_file(sensor["lon"][10:],sensor["lat"][10:],sensor["altP"][10:],"./output/gps_location.kml")
 

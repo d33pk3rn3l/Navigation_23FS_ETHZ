@@ -15,7 +15,7 @@ def write_kml_file(lon,lat,alt,file_out):
     for coor_cur in coor:
         str_coor = str_coor + ",".join(str(i) for i in coor_cur.tolist()) + "\n"
         
-    with open("Python/template.kml","r") as kml_hdl:
+    with open("template.kml","r") as kml_hdl:
         kml_str = kml_hdl.read()
         
     kml_str_new = kml_str.replace("coordinates_sensor",str_coor)
