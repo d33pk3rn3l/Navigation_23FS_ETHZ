@@ -159,4 +159,3 @@ plt.title('Position Scatter Plot')
 plt.colorbar(label='Altitude')
 plt.savefig("./output/position_scatter_plot.png", dpi=200)
 plt.show()
-
