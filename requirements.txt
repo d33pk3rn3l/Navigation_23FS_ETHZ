@@ -178,6 +178,7 @@ PyGObject==3.42.2
 pylint==2.16.2
 pylint-venv==2.3.0
 pyls-spyder==0.4.0
+pymap3d==3.0.1
 pyOpenSSL==23.0.0
 pyparsing==3.0.9
 PyQt5==5.15.9
