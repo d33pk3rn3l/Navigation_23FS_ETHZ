@@ -91,17 +91,19 @@ print("Yaw: {0:3.4f} (computed), {1:3.4f} (recorded)".format(y0,np.mean(sensor["
 
 # Reduce data to first interessting part
 START = 580 # seconds
-END = 1200 # seconds
+END = 800 # seconds (1100 is the end of the interesting part)
 sensor_reduced = sensor_reduce(sensor, [START, END], sampling)
 
 # Plot reduced data
 sensor_plot(sensor_reduced, ["Gyroscope"], "reduced")
 
 # Preparation
-g = 9.81
-sensor_reduced["accX"] *= -g
-sensor_reduced["accY"] *= -g
-sensor_reduced["accZ"] *= -g
+GRAVITY = 9.81
+EARTH_RADIUS = 6371000 # m
+sensor_reduced["accX"] *= -GRAVITY
+sensor_reduced["accY"] *= -GRAVITY
+sensor_reduced["accZ"] *= -GRAVITY
+gravity_vector = np.array([0, 0, GRAVITY])
 
 # Initialization
 init_position = np.array([np.mean(sensor_reduced["lat"][:100]),
@@ -123,18 +125,34 @@ def integrate_rotations_and_accelerations(sensor_data, init_position, init_veloc
     orientation[0] = init_orientation
 
     for i in range(1, num_data_points):
-        dt = sampling
+        step_dt = sampling
+
+        # Calculate orientation for transformation from body frame to navigation frame
         rotation_rates = np.array([ sensor_data["gyroX"][i],
                                     sensor_data["gyroY"][i],
                                     sensor_data["gyroZ"][i]])
-        orientation[i] = orientation[i - 1] + rotation_rates * dt
+        orientation[i] = orientation[i - 1] + rotation_rates * step_dt
+
+        # Calculate transformation matrix from body frame to navigation frame for current step
         C_bn = rot_b_n(orientation[i][0], orientation[i][1], orientation[i][2])
-        acceleration_navigation = np.dot(C_bn,
-                                         np.array([sensor_data["accX"][i],
-                                         sensor_data["accY"][i],
-                                         sensor_data["accZ"][i]]))
-        velocity[i] = velocity[i - 1] + acceleration_navigation * dt
-        position[i] = position[i - 1] + 0.5 * (velocity[i - 1] + velocity[i]) * dt
+        
+        # Transform acceleration from body frame to navigation frame
+        acceleration_nav = np.dot(C_bn,
+                                  np.array([sensor_data["accX"][i],
+                                            sensor_data["accY"][i],
+                                            sensor_data["accZ"][i]]))
+        
+        # Subtract gravity vector
+        acceleration_nav_corrected = acceleration_nav - gravity_vector
+
+        # Calculate velocity
+        velocity[i] = velocity[i - 1] + acceleration_nav_corrected * step_dt
+
+        # Update position with quick and dirty transformation to WGS84
+        dlat = velocity[i][0] * step_dt / EARTH_RADIUS # quick and dirty approximation, since movement is small
+        dlon = velocity[i][1] * step_dt / (EARTH_RADIUS * np.cos(np.deg2rad(position[i - 1][0]))) # d_e / R * cos(lat)
+        dalt = -velocity[i][2] * step_dt  # Subtracting because positive velocity[i][2] is in the downward direction
+        position[i] = position[i - 1] + np.array([np.rad2deg(dlat), np.rad2deg(dlon), dalt])
 
     return position, velocity, orientation
 
@@ -151,11 +169,14 @@ lon = position[:, 1]
 alt = position[:, 2]
 
 # Create the scatter plot
+title = "Position Scatter Plot (Period: " + str(END-START) + " seconds)"
 plt.figure()
 plt.scatter(lon, lat, c=alt, cmap='viridis', marker='.')
 plt.xlabel('Longitude')
 plt.ylabel('Latitude')
-plt.title('Position Scatter Plot')
+plt.title(title)
 plt.colorbar(label='Altitude')
 plt.savefig("./output/position_scatter_plot.png", dpi=200)
+plt.xlim([np.min(lon), np.max(lon)])
+plt.ylim([np.min(lat), np.max(lat)])
 plt.show()
