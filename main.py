@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Mar 17 15:09:39 2023
-
 @author: lukamueller
 """
 import os
@@ -132,13 +131,15 @@ def integrate_rotations_and_accelerations(sensor_data, init_position, init_veloc
     num_data_points = len(sensor_data["time"])
     position = np.zeros((num_data_points, 3)) # [lat, lon, alt]
     velocity = np.zeros((num_data_points, 3)) # [v_n, v_e, v_d]
-    orientation = np.zeros((num_data_points, 3)) # [roll, pitch, yaw] in navigation frame
+    orientation_delta = np.zeros((num_data_points, 3)) # [roll, pitch, yaw] in navigation frame
 
     # Set initial values
     position[0] = init_position
     velocity[0] = init_velocity
-    orientation[0] = init_orientation
+    orientation_delta[0] = init_orientation
 
+    C_bn0 = rot_b_n(init_orientation[0],init_orientation[1],init_orientation[2])
+    
     for i in range(1, num_data_points):
         step_dt = sampling
 
@@ -146,11 +147,11 @@ def integrate_rotations_and_accelerations(sensor_data, init_position, init_veloc
         rotation_rates = np.array([ sensor_data["gyroX"][i],
                                     sensor_data["gyroY"][i],
                                     sensor_data["gyroZ"][i]])
-        orientation[i] = orientation[i - 1] + rotation_rates * step_dt
+        orientation_delta[i] = rotation_rates * step_dt 
 
         # Calculate transformation matrix from body frame to navigation frame for current step
-        C_bn = rot_b_n(orientation[i][0], orientation[i][1], orientation[i][2])
-        
+        C_bn_delta = np.array([[1,0,0],[0,-1,0],[0,0,1]])@rot_b_n(orientation_delta[i][0], orientation_delta[i][1], orientation_delta[i][2])
+        C_bn = C_bn0 @ C_bn_delta
         # Transform acceleration from body frame to navigation frame
         acceleration_nav = np.dot(C_bn,
                                   np.array([sensor_data["accX"][i],
@@ -162,14 +163,16 @@ def integrate_rotations_and_accelerations(sensor_data, init_position, init_veloc
 
         # Calculate velocity
         velocity[i] = velocity[i - 1] + acceleration_nav_corrected * step_dt
-
+        
         # Update position with quick and dirty transformation to WGS84
         dlat = velocity[i][0] * step_dt / EARTH_RADIUS # quick and dirty approximation, since movement is small
         dlon = velocity[i][1] * step_dt / (EARTH_RADIUS * np.cos(np.deg2rad(position[i - 1][0]))) # d_e / R * cos(lat)
         dalt = -velocity[i][2] * step_dt  # Subtracting because positive velocity[i][2] is in the downward direction
         position[i] = position[i - 1] + np.array([np.rad2deg(dlat), np.rad2deg(dlon), dalt])
+        
+        C_bn0 = C_bn
 
-    return position, velocity, orientation
+    return position, velocity, orientation_delta
 
 position, velocity, orientation = integrate_rotations_and_accelerations(sensor_reduced,
                                                                         init_position,
